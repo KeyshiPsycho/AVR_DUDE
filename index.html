@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interface de supervision de température et de puissance avec moniteur série.">
+  <meta name="color-scheme" content="light">
+  <title>ThermoLab — Supervision thermique</title>
+  <style>
+    :root { --ink:#22332f; --muted:#697872; --green:#26705c; --line:#e0e7e1; --paper:#fff; --orange:#ce693a; --teal:#258b89; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f3f5f1; color:var(--ink); font:14px/1.5 "Segoe UI",Arial,sans-serif; }
+    button,input { font:inherit; }
+    button,input[type=checkbox],input[type=range] { cursor:pointer; }
+    button { border:1px solid var(--line); border-radius:7px; padding:10px 15px; background:white; color:var(--ink); font-weight:600; }
+    button:hover { background:#edf3ee; }
+    :focus-visible { outline:3px solid #609e88; outline-offset:4px; }
+    input { accent-color:var(--green); }
+    .shell { width:min(1480px,100%); margin:auto; padding:0 36px; }
+    .topbar { background:var(--paper); border-bottom:1px solid var(--line); }
+    .topbar .shell,.brand,.status,.intro,.panel-head,.panel-foot,.chart-head,.range-label,.bottom { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    .topbar .shell { min-height:77px; }
+    .brand { justify-content:flex-start; gap:11px; font-size:19px; font-weight:800; letter-spacing:-.7px; }
+    .brand svg { width:34px; height:34px; }
+    .brand span { color:var(--green); font-weight:400; }
+    .project { border-left:1px solid var(--line); margin-left:12px; padding-left:22px; font-size:12px; color:var(--muted); font-weight:500; letter-spacing:0; }
+    .status { gap:8px; color:var(--muted); font-size:12px; }
+    .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#9aa79f; flex-shrink:0; }
+    .intro { margin:32px 0 24px; align-items:flex-end; }
+    .eyebrow { margin:0 0 7px; color:var(--green); font-size:10px; font-weight:700; letter-spacing:2px; }
+    h1 { margin:0; font-size:30px; font-weight:650; letter-spacing:-1px; }
+    .subtitle { margin:6px 0 0; color:var(--muted); }
+    .connection-badge { display:inline-flex; align-items:center; gap:8px; background:#e8eee6; border:1px solid #d8e2d5; padding:7px 11px; border-radius:5px; font-size:11px; font-weight:600; white-space:nowrap; }
+    .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:25px; }
+    .metric { padding:19px 23px; background:var(--paper); border:1px solid var(--line); border-radius:10px; position:relative; overflow:hidden; }
+    .metric::before { content:""; position:absolute; left:0; top:22px; bottom:22px; width:3px; background:var(--accent,var(--green)); }
+    .metric-label { color:var(--muted); font-size:11px; letter-spacing:1px; text-transform:uppercase; }
+    .metric strong { display:block; margin:4px 0; font-size:30px; line-height:1.25; font-weight:600; letter-spacing:-.8px; font-variant-numeric:tabular-nums; }
+    .metric small { color:var(--muted); font-size:12px; }
+    .workspace { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(230px,.85fr) minmax(0,1.05fr); grid-template-areas:"charts controls terminal"; gap:20px; align-items:stretch; }
+    .panel { background:var(--paper); border:1px solid var(--line); border-radius:10px; overflow:hidden; min-width:0; }
+    .panel-head { padding:19px 20px; border-bottom:1px solid var(--line); }
+    h2 { margin:0; font-size:14px; font-weight:650; }
+    .index { color:#86958d; font:11px Consolas,monospace; }
+    .terminal { grid-area:terminal; background:#172822; color:#d7e3dc; border-color:#172822; display:flex; flex-direction:column; }
+    .command-panel { grid-area:controls; }
+    .terminal .panel-head { border-color:#31433a; }
+    .terminal h2 { color:#f1f6f2; }
+    .terminal .index { color:#a2b4a9; }
+    .terminal-meta { padding:12px 19px; color:#8da799; font:10px Consolas,monospace; border-bottom:1px solid #293b32; letter-spacing:.5px; }
+    #console { height:389px; overflow:auto; padding:13px 18px; font:11px/1.9 Consolas,"Courier New",monospace; scrollbar-color:#526b5b #172822; }
+    .log { display:grid; grid-template-columns:62px 35px 1fr; gap:7px; padding:3px 0; align-items:baseline; }
+    .log time { color:#8ca395; }
+    .log b { font-size:10px; color:#82cba6; font-weight:400; }
+    .log.info b { color:#e8ba7c; }
+    .log span { overflow-wrap:anywhere; white-space:pre-wrap; }
+    .panel-foot { margin-top:auto; padding:14px 18px; border-top:1px solid #31433a; font-size:11px; color:#b0c2b6; }
+    .panel-foot label { display:flex; align-items:center; gap:6px; }
+    .panel-foot button { background:transparent; border-color:#476151; color:#d7e3dc; padding:6px 10px; font-size:11px; }
+    .panel-foot button:hover { background:#293e32; }
+    .controls { padding:20px; }
+    fieldset { margin:0 0 22px; padding:0; border:0; }
+    legend,.field-label { display:block; margin-bottom:10px; font-size:12px; font-weight:600; }
+    .mode-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .mode-options label { display:flex; align-items:center; gap:7px; padding:11px 8px; border:1px solid var(--line); border-radius:6px; font-size:12px; cursor:pointer; }
+    .mode-options label:has(:checked) { border-color:#8daf9b; background:#f0f6ef; color:var(--green); }
+    input[type=checkbox] { margin:0; width:14px; height:14px; flex-shrink:0; }
+    .hint { font-size:11px; color:var(--muted); margin:9px 0 0; }
+    .number-field { display:flex; align-items:center; border:1px solid #cfd9d1; border-radius:7px; padding-right:15px; background:#fbfcfa; }
+    .number-field:focus-within { outline:2px solid #609e88; outline-offset:2px; }
+    .number-field input { width:100%; min-width:0; border:0; background:transparent; padding:11px 14px; color:var(--ink); font-size:25px; outline:0; }
+    .number-field span { color:var(--muted); font-size:15px; }
+    .power-field { margin:23px 0; }
+    .range-label { margin-bottom:12px; }
+    .range-label label { font-size:12px; font-weight:600; }
+    .range-label output { color:var(--green); font-size:17px; font-weight:650; }
+    input[type=range] { width:100%; margin:0; }
+    input:disabled { opacity:.4; cursor:not-allowed; }
+    .range-ends { display:flex; justify-content:space-between; color:var(--muted); font-size:10px; margin-top:4px; }
+    .apply { width:100%; padding:12px; background:var(--green); border-color:var(--green); color:white; }
+    .apply:hover { background:#1c5847; }
+    #feedback { min-height:36px; margin:12px 0 0; color:var(--green); font-size:11px; }
+    .notice { margin:10px 0 0; border-top:1px solid var(--line); padding-top:15px; font-size:11px; color:var(--muted); line-height:1.7; }
+    .charts { grid-area:charts; display:grid; gap:18px; grid-template-rows:1fr 1fr; min-width:0; }
+    .chart-card { padding:18px 20px 12px; }
+    .chart-head { align-items:flex-start; }
+    .chart-head p { color:var(--muted); font-size:10px; margin:4px 0 0; }
+    .chart-value { font:600 19px "Segoe UI",sans-serif; white-space:nowrap; }
+    .temperature { color:var(--orange); }
+    .power { color:var(--teal); }
+    .chart { display:block; width:100%; height:160px; overflow:visible; margin-top:8px; }
+    .legend { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:10px; color:var(--muted); }
+    .legend i { display:inline-block; width:14px; height:3px; margin-right:6px; vertical-align:middle; background:currentColor; border-radius:3px; }
+    .bottom { color:var(--muted); font-size:10px; padding:20px 0 24px; }
+    @media (min-width:1600px) { .intro { margin-top:45px; } #console { height:430px; } .chart { height:180px; } }
+    @media (max-width:900px) { .shell { padding:0 22px; } .workspace { grid-template-columns:1.2fr 1fr; grid-template-areas:"charts terminal" "controls controls"; } }
+    @media (max-width:650px) { .shell { padding:0 16px; } .project,.topbar .status { display:none; } .topbar .shell { min-height:65px; } .intro { align-items:flex-start; flex-direction:column; gap:14px; margin-top:24px; } h1 { font-size:27px; } .metrics { gap:8px; margin-bottom:18px; } .metric { padding:13px 11px; } .metric strong { font-size:22px; } .metric-label { font-size:9px; letter-spacing:0; } .metric small { font-size:10px; } .workspace { grid-template-columns:1fr; grid-template-areas:"charts" "controls" "terminal"; } #console { height:280px; } .bottom { align-items:flex-start; gap:8px; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell">
+      <div class="brand">
+        <svg viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect width="36" height="36" rx="9" fill="#26705c"/><path d="M7 20h6l3-9 5 16 3-9h5" stroke="#e6f1dd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div>THERMO<span>LAB</span></div><div class="project">PROJET DEVSECOPS</div>
+      </div>
+      <div class="status"><span class="dot"></span><span>Appareil déconnecté</span></div>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="intro" aria-labelledby="page-title">
+      <div><p class="eyebrow">TABLEAU DE BORD / 01</p><h1 id="page-title">Supervision thermique</h1><p class="subtitle">Vos mesures et vos commandes, dans un même espace.</p></div>
+      <span class="connection-badge"><span class="dot"></span>EN ATTENTE DE CONNEXION</span>
+    </section>
+    <section class="metrics" aria-label="État du système">
+      <article class="metric" style="--accent:var(--orange)"><div class="metric-label">Température mesurée</div><strong id="temperature-value">— °C</strong><small>Consigne préparée : <span id="setpoint-value">— °C</span></small></article>
+      <article class="metric" style="--accent:var(--teal)"><div class="metric-label">Puissance mesurée</div><strong id="power-value">— %</strong><small>En attente de mesures</small></article>
+      <article class="metric"><div class="metric-label">Mode sélectionné</div><strong id="mode-value">Manuel</strong><small id="mode-caption">Réglage local · appareil déconnecté</small></article>
+    </section>
+    <div class="workspace">
+      <section class="charts" aria-label="Historique des mesures">
+        <article class="panel chart-card">
+          <div class="chart-head"><div><h2>Température</h2><p>ÉVOLUTION DANS LE TEMPS</p></div><span class="chart-value temperature" id="temperature-chart-value">— °C</span></div>
+          <svg class="chart temperature" id="temperature-chart" viewBox="0 0 520 180" role="img" aria-label="Graphique de température en degrés Celsius, en attente de mesures"></svg>
+          <div class="legend"><span><i class="temperature"></i>Température</span><span>Aucune donnée reçue</span></div>
+        </article>
+        <article class="panel chart-card">
+          <div class="chart-head"><div><h2>Puissance</h2><p>ÉVOLUTION DANS LE TEMPS</p></div><span class="chart-value power" id="power-chart-value">— %</span></div>
+          <svg class="chart power" id="power-chart" viewBox="0 0 520 180" role="img" aria-label="Graphique de puissance en pourcentage, en attente de mesures"></svg>
+          <div class="legend"><span><i class="power"></i>Puissance</span><span>Aucune donnée reçue</span></div>
+        </article>
+      </section>
+      <section class="panel command-panel" aria-labelledby="controls-title">
+        <div class="panel-head"><h2 id="controls-title">Commandes</h2><span class="index">02 / RÉGLAGES</span></div>
+        <form class="controls" id="controls">
+          <fieldset aria-describedby="mode-hint"><legend>Mode de fonctionnement</legend><div class="mode-options">
+            <label><input id="manual" name="mode" type="checkbox" checked> Manuel</label>
+            <label><input id="automatic" name="mode" type="checkbox"> Automatique</label>
+          </div><p class="hint" id="mode-hint">Réglez la puissance manuellement.</p></fieldset>
+          <label class="field-label" for="setpoint">Température de consigne</label>
+          <div class="number-field"><input id="setpoint" type="number" step="any" value="45" required aria-describedby="temperature-hint"><span aria-hidden="true">°C</span></div>
+          <p class="hint" id="temperature-hint">Température cible en degrés Celsius.</p>
+          <div class="power-field">
+            <div class="range-label"><label for="power-input">Puissance demandée</label><output id="power-output" for="power-input">35 %</output></div>
+            <input id="power-input" type="range" min="0" max="100" value="35" aria-describedby="power-hint">
+            <div class="range-ends" aria-hidden="true"><span>0 %</span><span>100 %</span></div>
+            <p class="hint" id="power-hint">Puissance relative en pourcentage.</p>
+          </div>
+          <button class="apply" type="submit">Préparer les consignes <span aria-hidden="true">↗</span></button>
+          <p id="feedback" role="status">Prêt à recevoir vos réglages.</p>
+          <p class="notice">Appareil déconnecté. Les consignes restent locales jusqu’à la mise en place de la connexion matérielle.</p>
+        </form>
+      </section>
+      <section class="panel terminal" aria-labelledby="console-title">
+        <div class="panel-head"><h2 id="console-title"><span aria-hidden="true">&gt;_</span> Moniteur série</h2><span class="index">03 / FLUX</span></div>
+        <div class="terminal-meta">PORT SÉRIE : NON CONNECTÉ</div>
+        <div id="console" role="log" aria-live="off" aria-label="Journal série et messages de l’interface" tabindex="0"></div>
+        <div class="panel-foot"><label><input type="checkbox" id="autoscroll" checked> Défilement auto</label><button id="clear" type="button">Effacer</button></div>
+      </section>
+    </div>
+    <footer class="bottom"><span>THERMOLAB / Frontend · Examen DevSecOps</span><span>En attente de données du matériel</span></footer>
+    <noscript><p>Activez JavaScript pour utiliser les commandes et afficher les graphiques.</p></noscript>
+  </main>
+  <script>
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const format = (value, digits = 1) => value.toLocaleString('fr-FR', { maximumFractionDigits:digits, minimumFractionDigits:digits });
+    function log(message, type = 'INFO', date = new Date()) {
+      const row = document.createElement('div');
+      row.className = `log ${type === 'INFO' ? 'info' : ''}`;
+      const time = document.createElement('time'), tag = document.createElement('b'), text = document.createElement('span');
+      time.textContent = date.toLocaleTimeString('fr-FR', { hour12:false });
+      tag.textContent = type;
+      text.textContent = message; // Les messages ne sont jamais interprétés comme du HTML.
+      row.append(time, tag, text);
+      $('console').append(row);
+      if ($('console').childElementCount > 120) $('console').firstElementChild.remove();
+      if ($('autoscroll').checked) $('console').scrollTop = $('console').scrollHeight;
+    }
+    function emptyChart(id, unit) {
+      const svg = $(id);
+      function element(tag, attributes, text) {
+        const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
+        if (text !== undefined) node.textContent = text;
+        svg.append(node);
+      }
+      for (let i = 0; i <= 4; i++) element('line', { x1:38, x2:508, y1:16 + i * 33, y2:16 + i * 33, stroke:'#e5eae4', 'stroke-dasharray':'3 4' });
+      element('text', { x:20, y:20, fill:'#6d7b73', 'font-size':11 }, unit);
+      element('text', { x:273, y:88, fill:'#6d7b73', 'font-size':14, 'text-anchor':'middle' }, 'En attente de mesures');
+      element('text', { x:508, y:173, fill:'#6d7b73', 'font-size':10, 'text-anchor':'end' }, 'Temps');
+    }
+    for (const id of ['manual', 'automatic']) $(id).addEventListener('change', () => {
+      $('manual').checked = id === 'manual';
+      $('automatic').checked = id === 'automatic';
+      $('power-input').disabled = id === 'automatic';
+      $('mode-hint').textContent = id === 'automatic' ? 'La régulation automatique sera définie avec le matériel.' : 'Réglez la puissance manuellement.';
+      $('feedback').textContent = 'Modifications en attente de préparation.';
+    });
+    $('controls').addEventListener('input', () => {
+      $('setpoint').setCustomValidity('');
+      $('power-output').textContent = `${$('power-input').value} %`;
+      $('feedback').textContent = 'Modifications en attente de préparation.';
+    });
+    $('controls').addEventListener('submit', event => {
+      event.preventDefault();
+      const setpoint = $('setpoint').valueAsNumber;
+      if (!Number.isFinite(setpoint)) {
+        $('setpoint').setCustomValidity('Saisissez une température numérique valide.');
+        $('setpoint').reportValidity();
+        return;
+      }
+      const mode = $('manual').checked ? 'Manuel' : 'Automatique';
+      $('setpoint-value').textContent = `${format(setpoint)} °C`;
+      $('mode-value').textContent = mode;
+      $('feedback').textContent = 'Consignes préparées localement. Aucun envoi au matériel.';
+      log(`Consignes locales : ${mode.toLowerCase()} · ${format(setpoint)} °C${mode === 'Manuel' ? ` · ${$('power-input').value} %` : ''}. Non envoyées.`);
+    });
+    $('clear').addEventListener('click', () => $('console').replaceChildren());
+    $('autoscroll').addEventListener('change', () => { if ($('autoscroll').checked) $('console').scrollTop = $('console').scrollHeight; });
+    log('Appareil déconnecté. En attente de connexion série.');
+    emptyChart('temperature-chart', '°C');
+    emptyChart('power-chart', '%');
+  </script>
+</body>
+</html>
